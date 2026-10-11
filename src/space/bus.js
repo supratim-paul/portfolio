@@ -29,12 +29,13 @@ export const sectorFor = (pathname) => {
   return 'home';
 };
 
-// World layout. Camera flies between these bodies when the route changes.
+// World layout. Camera flies between these black holes when the route changes.
+// r = half-size of the billboard that draws the hole + accretion disk.
 export const BODIES = {
-  terra: { pos: [16, -2, 0], r: 9 },
-  ember: { pos: [-170, 20, -230], r: 11 },
-  giant: { pos: [130, -6, -720], r: 15 },
-  sun: { pos: [-60, 10, -1100], r: 22 }
+  home: { pos: [16, -2, 0], r: 26 },
+  about: { pos: [-170, 20, -230], r: 24 },
+  experience: { pos: [130, -6, -720], r: 30 },
+  contact: { pos: [-60, 10, -1100], r: 34 }
 };
 
 const frame = (b, dist, shift = 0.34, rise = 3) => ({
@@ -43,29 +44,29 @@ const frame = (b, dist, shift = 0.34, rise = 3) => ({
 
 export const SECTORS = {
   home: {
-    n: '01', name: 'Terra', desc: 'Low orbit', travel: 6,
-    f: frame(BODIES.terra, 36, 0.4),
-    pal: ['#17267a', '#5436c8', '#3fb7ff', 0.9]
+    n: '01', name: 'Singularity', desc: 'Event horizon', travel: 6,
+    f: frame(BODIES.home, 100, 0.4),
+    pal: ['#101a5c', '#3a2a9a', '#2f8fd0', 0.7]
   },
   about: {
-    n: '02', name: 'Ember', desc: 'Dust-storm world', travel: 6,
-    f: frame(BODIES.ember, 34, 0.4),
-    pal: ['#5a1a3a', '#a8352c', '#ff9a5a', 0.85]
+    n: '02', name: 'Cinder', desc: 'Dying accretion disk', travel: 6,
+    f: frame(BODIES.about, 96, 0.4),
+    pal: ['#4a1530', '#8a2a2a', '#d8783a', 0.65]
   },
   projects: {
-    n: '03', name: 'The Belt', desc: 'Debris field', travel: 150,
+    n: '03', name: 'Starfield', desc: 'Open star cluster', travel: 150,
     fixed: { cam: [50, 0, -340], look: [50, 0, -430] },
-    pal: ['#0b4552', '#2a3fa8', '#6fe3ff', 0.9]
+    pal: ['#0a3440', '#1f2f80', '#4fb8d8', 0.6]
   },
   experience: {
-    n: '04', name: 'Aurelia', desc: 'Ringed giant', travel: 8,
-    f: frame(BODIES.giant, 52),
-    pal: ['#25268a', '#7a3fd0', '#ff7ad9', 0.9]
+    n: '04', name: 'Quasar', desc: 'Active galactic core', travel: 8,
+    f: frame(BODIES.experience, 120),
+    pal: ['#1e1f70', '#6a2fb0', '#d85ab8', 0.7]
   },
   contact: {
-    n: '05', name: 'Helion', desc: 'Home star', travel: 4,
-    f: frame(BODIES.sun, 170, 0.36, 0),
-    pal: ['#6b2a0c', '#a23a1f', '#ffc067', 0.95]
+    n: '05', name: 'Omega', desc: 'Last light', travel: 4,
+    f: frame(BODIES.contact, 136, 0.36, 0),
+    pal: ['#4a2008', '#8a3418', '#e8a850', 0.7]
   }
 };
 
@@ -74,7 +75,7 @@ export function sectorTarget(key, portrait) {
   if (s.fixed) return { cam: s.fixed.cam, look: s.fixed.look };
   const { body, dist, shift, rise } = s.f;
   const p = body.pos;
-  const d = portrait ? dist * 1.18 : dist;
+  const d = portrait ? dist * 1.25 : dist;
   const sh = portrait ? 0 : shift;
   const camX = p[0] - dist * sh;
   const lookDrop = portrait ? d * 0.13 : 0;

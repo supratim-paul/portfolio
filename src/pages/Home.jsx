@@ -13,10 +13,10 @@ const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.12, delay
 const rise = { hidden: { opacity: 0, y: 28 }, show: { opacity: 1, y: 0, transition: { duration: 0.8, ease: [0.2, 0.7, 0.2, 1] } } };
 
 const destinations = [
-  { to: '/about', name: 'About', line: 'The person behind the commits.', sector: 'Ember', orb: 'ember' },
-  { to: '/projects', name: 'Projects', line: 'Four missions, flown end to end.', sector: 'The Belt', orb: 'belt' },
-  { to: '/experience', name: 'Experience', line: 'Work, study, and the toolkit.', sector: 'Aurelia', orb: 'giant', ring: true },
-  { to: '/contact', name: 'Contact', line: 'Open a channel.', sector: 'Helion', orb: 'sun' }
+  { to: '/about', name: 'About', line: 'The person behind the commits.', sector: 'Cinder', orb: 'ember' },
+  { to: '/projects', name: 'Projects', line: 'Four missions, flown end to end.', sector: 'Starfield', orb: 'belt' },
+  { to: '/experience', name: 'Experience', line: 'Work, study, and the toolkit.', sector: 'Quasar', orb: 'giant' },
+  { to: '/contact', name: 'Contact', line: 'Open a channel.', sector: 'Omega', orb: 'sun' }
 ];
 
 export default function Home() {
@@ -60,7 +60,7 @@ export default function Home() {
             <Reveal key={d.to} delay={i * 0.08}>
               <Tilt max={12} className="dest">
                 <Link to={d.to} className="dest-link" data-hover>
-                  <Orb kind={d.orb} size={70} ring={d.ring} className="z3" />
+                  <Orb kind={d.orb} size={70} className="z3" />
                   <span className="dest-sector z2">{d.sector}</span>
                   <b className="dest-name z2">{d.name}</b>
                   <span className="dest-line z1">{d.line}</span>

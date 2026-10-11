@@ -26,7 +26,7 @@ function Item({ p, i }) {
         viewport={{ margin: '-45% 0px -45% 0px' }}
         transition={{ type: 'spring', stiffness: 160, damping: 14 }}
       >
-        <Orb kind={kinds[p.cls]} size={78} ring hot={hot} />
+        <Orb kind={kinds[p.cls]} size={78} hot={hot} />
       </motion.div>
 
       <motion.div

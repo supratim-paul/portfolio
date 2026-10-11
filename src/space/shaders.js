@@ -126,185 +126,79 @@ void main(){
   gl_FragColor = vec4(vec3(0.7, 0.85, 1.0) * vA, vA);
 }`;
 
-/* ---------- planets ---------- */
-export const planetVert = /* glsl */ `
-varying vec3 vObj;
-varying vec3 vWN;
-varying vec3 vWP;
-void main(){
-  vObj = position;
-  vWN = normalize(mat3(modelMatrix) * normal);
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vWP = wp.xyz;
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}`;
-
-export const terrainFrag = /* glsl */ `
-uniform float uTime;
-uniform vec3 uSun;
-uniform vec3 uSea;
-uniform vec3 uShore;
-uniform vec3 uLandA;
-uniform vec3 uLandB;
-uniform vec3 uIce;
-uniform vec3 uAtmo;
-uniform float uSeaLevel;
-uniform float uCloud;
-uniform float uSeed;
-varying vec3 vObj;
-varying vec3 vWN;
-varying vec3 vWP;
-${NOISE}
-void main(){
-  vec3 N = normalize(vWN);
-  vec3 V = normalize(cameraPosition - vWP);
-  vec3 p = normalize(vObj);
-  float h = fbm(p * 2.4 + uSeed);
-  float lat = abs(p.y);
-  vec3 col;
-  float spec = 0.0;
-  if (h < uSeaLevel) {
-    float d = smoothstep(uSeaLevel - 0.16, uSeaLevel, h);
-    col = mix(uSea * 0.6, uShore, d * d);
-    spec = 1.0;
-  } else {
-    float e = smoothstep(uSeaLevel, uSeaLevel + 0.22, h);
-    col = mix(uLandA, uLandB, e);
-    col *= 0.85 + 0.3 * fbm(p * 14.0 + uSeed);
-  }
-  float ice = smoothstep(0.86, 0.96, lat + (h - 0.5) * 0.25);
-  col = mix(col, uIce, ice);
-  float c = fbm(p * 3.6 + vec3(uTime * 0.012, 0.0, uTime * 0.008) + uSeed * 2.0);
-  c = smoothstep(0.55, 0.8, c) * uCloud;
-  col = mix(col, vec3(1.0), c);
-  float ndl = dot(N, uSun);
-  float diff = smoothstep(-0.08, 0.6, ndl);
-  vec3 H = normalize(uSun + V);
-  float s = pow(max(dot(N, H), 0.0), 70.0) * spec * (1.0 - c);
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 lit = col * (0.035 + 0.965 * diff) + vec3(s * 0.55);
-  lit += uAtmo * fres * (0.12 + 0.88 * clamp(ndl + 0.3, 0.0, 1.0));
-  gl_FragColor = vec4(lit, 1.0);
-}`;
-
-export const gasFrag = /* glsl */ `
-uniform float uTime;
-uniform vec3 uSun;
-uniform vec3 uA;
-uniform vec3 uB;
-uniform vec3 uC;
-uniform vec3 uAtmo;
-uniform float uSeed;
-varying vec3 vObj;
-varying vec3 vWN;
-varying vec3 vWP;
-${NOISE}
-void main(){
-  vec3 N = normalize(vWN);
-  vec3 V = normalize(cameraPosition - vWP);
-  vec3 p = normalize(vObj);
-  float lat = p.y;
-  float warp = fbm(vec3(p.x * 3.0, p.y * 7.0, p.z * 3.0) + uTime * 0.02 + uSeed) * 0.35;
-  float band = 0.5 + 0.5 * sin((lat + warp) * 24.0);
-  float band2 = fbm(vec3(0.0, (lat + warp) * 13.0, 0.0) + uSeed);
-  vec3 col = mix(uA, uB, band);
-  col = mix(col, uC, band2 * 0.65);
-  col *= 0.9 + 0.2 * fbm(p * 18.0);
-  float ang = atan(p.z, p.x);
-  float spot = smoothstep(0.17, 0.0, length(vec2(ang - 0.9, (lat + 0.28) * 2.2)));
-  col = mix(col, vec3(0.78, 0.38, 0.26), spot * 0.85);
-  float ndl = dot(N, uSun);
-  float diff = smoothstep(-0.1, 0.65, ndl);
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 lit = col * (0.04 + 0.96 * diff);
-  lit += uAtmo * fres * (0.1 + 0.9 * clamp(ndl + 0.3, 0.0, 1.0)) * 0.9;
-  gl_FragColor = vec4(lit, 1.0);
-}`;
-
-export const atmoVert = /* glsl */ `
-varying vec3 vN;
-varying vec3 vWN;
-void main(){
-  vN = normalize(normalMatrix * normal);
-  vWN = normalize(mat3(modelMatrix) * normal);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-export const atmoFrag = /* glsl */ `
-uniform vec3 uColor;
-uniform vec3 uSun;
-uniform float uPow;
-uniform float uInt;
-varying vec3 vN;
-varying vec3 vWN;
-void main(){
-  float i = pow(max(0.0, 0.68 - dot(vN, vec3(0.0, 0.0, 1.0))), uPow);
-  float lit = clamp(dot(normalize(vWN), uSun) + 0.45, 0.0, 1.0);
-  float k = i * uInt * (0.25 + 0.75 * lit);
-  gl_FragColor = vec4(uColor * k, k);
-}`;
-
-export const ringVert = /* glsl */ `
-varying vec2 vP;
-void main(){
-  vP = position.xy;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-}`;
-export const ringFrag = /* glsl */ `
-uniform float uIn;
-uniform float uOut;
-uniform vec3 uA;
-uniform vec3 uB;
-varying vec2 vP;
-${NOISE}
-void main(){
-  float r = (length(vP) - uIn) / (uOut - uIn);
-  float edge = smoothstep(0.0, 0.05, r) * smoothstep(1.0, 0.9, r);
-  float bands = 0.5 + 0.5 * sin(r * 70.0 + sin(r * 17.0) * 2.0);
-  float grain = vnoise(vec3(r * 90.0, 0.0, 1.0));
-  float gap = smoothstep(0.0, 0.02, abs(r - 0.64) - 0.025);
-  float a = edge * (0.25 + 0.55 * bands + 0.2 * grain) * gap;
-  vec3 col = mix(uA, uB, bands * 0.8 + grain * 0.2);
-  gl_FragColor = vec4(col, a * 0.85);
-}`;
-
-/* ---------- sun ---------- */
-export const sunFrag = /* glsl */ `
-uniform float uTime;
-varying vec3 vObj;
-varying vec3 vWN;
-varying vec3 vWP;
-${NOISE}
-void main(){
-  vec3 N = normalize(vWN);
-  vec3 V = normalize(cameraPosition - vWP);
-  vec3 p = normalize(vObj);
-  float n = fbm(p * 3.0 + vec3(0.0, 0.0, uTime * 0.08));
-  float n2 = fbm(p * 9.0 - vec3(uTime * 0.05));
-  vec3 col = mix(vec3(1.0, 0.32, 0.04), vec3(1.0, 0.86, 0.45), n);
-  col += n2 * 0.35;
-  float mu = max(dot(N, V), 0.0);
-  col *= mix(0.5, 1.2, pow(mu, 0.5));
-  gl_FragColor = vec4(col, 1.0);
-}`;
-export const glowVert = /* glsl */ `
+/* ---------- black hole (billboard: horizon, lensed halo, tilted accretion disk) ---------- */
+export const bhVert = /* glsl */ `
 varying vec2 vUv;
 void main(){
   vUv = uv;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
 }`;
-export const glowFrag = /* glsl */ `
+
+export const bhFrag = /* glsl */ `
 uniform float uTime;
+uniform vec3 uHot;
+uniform vec3 uCool;
+uniform float uTilt;
+uniform float uRoll;
 uniform float uVis;
 varying vec2 vUv;
+${NOISE}
+
+vec3 diskColor(float t){
+  // t: 0 = outer / cool, 1 = inner / hot
+  vec3 c = mix(uCool * 0.35, uCool, smoothstep(0.0, 0.5, t));
+  c = mix(c, uHot, smoothstep(0.35, 0.9, t));
+  return mix(c, vec3(1.0), smoothstep(0.82, 1.0, t) * 0.6);
+}
+
+float diskTex(float r, float a, float seed){
+  float aa = a + uTime * (0.9 / (r * 6.0 + 0.5)) + seed;
+  vec3 q = vec3(cos(aa) * r * 9.0, sin(aa) * r * 9.0, r * 22.0);
+  float n = fbm(q);
+  float streak = 0.5 + 0.5 * sin(r * 90.0 + n * 6.0);
+  return 0.35 + 0.65 * mix(n, streak, 0.45);
+}
+
 void main(){
   vec2 p = (vUv - 0.5) * 2.0;
+  float cr = cos(uRoll), sr = sin(uRoll);
+  p = vec2(cr * p.x + sr * p.y, -sr * p.x + cr * p.y);
+
+  float rh = 0.15;           // event horizon
   float d = length(p);
+  float hole = smoothstep(rh, rh * 0.94, d);
+
+  // lensed halo: back of the disk bent over and under the hole
+  float vert = smoothstep(0.0, 0.85, abs(p.y) / max(d, 0.001));
   float ang = atan(p.y, p.x);
-  float core = exp(-d * 5.0);
-  float halo = pow(max(1.0 - d, 0.0), 2.5);
-  float rays = (0.55 + 0.45 * sin(ang * 9.0 + uTime * 0.15)) * (0.6 + 0.4 * sin(ang * 23.0 - uTime * 0.1));
-  float corona = pow(max(1.0 - d, 0.0), 4.0) * rays;
-  vec3 col = vec3(1.0, 0.62, 0.25) * (halo * 0.55 + corona * 1.1) + vec3(1.0, 0.9, 0.7) * core * 1.4;
+  float rl = d;
+  float haloBand = smoothstep(rh * 1.02, rh * 1.5, rl) * smoothstep(0.62, rh * 1.7, rl);
+  float haloT = clamp(1.0 - (rl - rh) / 0.5, 0.0, 1.0);
+  float halo = haloBand * (0.25 + 0.75 * vert) * diskTex(rl, ang, 3.0) * pow(haloT, 1.4);
+  vec3 col = diskColor(haloT) * halo * 1.35;
+
+  // photon ring
+  float ring = exp(-pow((d - rh * 1.18) / 0.012, 2.0));
+  col += mix(uHot, vec3(1.0), 0.55) * ring * 1.6;
+
+  // tilted accretion disk
+  float s = max(uTilt, 0.05);
+  vec2 dp = vec2(p.x, p.y / s);
+  float r = length(dp);
+  float rin = 0.2, rout = 0.95;
+  float dm = smoothstep(rin, rin + 0.04, r) * smoothstep(rout, rout - 0.35, r);
+  float t = clamp(1.0 - (r - rin) / (rout - rin), 0.0, 1.0);
+  float da = atan(dp.y, dp.x);
+  float tex = diskTex(r * 0.8, da, 0.0);
+  float doppler = 1.0 + 0.7 * (dp.x / max(r, 0.001));
+  vec3 dcol = diskColor(pow(t, 0.8)) * tex * doppler * pow(t, 0.55) * 2.1;
+  float front = step(p.y, 0.0);           // near half draws over the hole
+  float backMask = (1.0 - hole);          // far half hidden behind it
+  col += dcol * dm * mix(backMask, 1.0, front);
+
+  // soft outer glow
+  col += uCool * 0.07 * smoothstep(1.0, 0.1, d) * smoothstep(rh, rh * 1.6, d);
+
   col *= smoothstep(1.0, 0.82, d) * uVis;
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, hole * uVis);
 }`;

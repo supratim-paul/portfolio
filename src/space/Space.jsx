@@ -10,17 +10,6 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const easeIO = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
-function jitter(geo, amp, freq) {
-  const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const d = 1 + amp * (Math.sin(x * freq * 1.3 + 1.1) * Math.sin(y * freq * 1.1 + 2.3) * Math.sin(z * freq * 1.7 + 0.7));
-    p.setXYZ(i, x * d, y * d, z * d);
-  }
-  geo.computeVertexNormals();
-  return geo;
-}
-
 export default function Space() {
   const host = useRef(null);
 
@@ -46,7 +35,6 @@ export default function Space() {
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000);
     const U = { time: { value: 0 } };
-    const SUN = new THREE.Vector3(-0.55, 0.35, 0.76).normalize();
     const disposables = [];
     const track = (o) => { disposables.push(o); return o; };
 
@@ -104,6 +92,8 @@ export default function Space() {
     };
     const starsFar = makeStars(small ? 3200 : 6000, 500, 1400, 1.2, 3.2);
     const starsBright = makeStars(small ? 60 : 140, 450, 1300, 4, 9);
+    starsFar.renderOrder = -50;
+    starsBright.renderOrder = -50;
     scene.add(starsFar, starsBright);
 
     /* ---------- near dust (parallax) ---------- */
@@ -120,6 +110,7 @@ export default function Space() {
       uBox: { value: new THREE.Vector3(160, 160, 160) }, uScale: { value: dpr }
     }, { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     dust.frustumCulled = false;
+    dust.renderOrder = 5;
     scene.add(dust);
 
     /* ---------- warp streaks ---------- */
@@ -138,147 +129,67 @@ export default function Space() {
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
     }));
     warpLines.frustumCulled = false;
+    warpLines.renderOrder = 6;
     scene.add(warpLines);
 
-    /* ---------- lights (for moons / rocks) ---------- */
-    const sunLight = new THREE.DirectionalLight(0xfff0dc, 2.3);
-    sunLight.position.copy(SUN).multiplyScalar(100);
-    scene.add(sunLight, new THREE.AmbientLight(0x4a5590, 0.6));
-
-    /* ---------- helpers for bodies ---------- */
-    const atmosphere = (r, color, intensity, power = 3) => new THREE.Mesh(
-      track(new THREE.SphereGeometry(r * 1.13, 64, 48)),
-      shader(S.atmoVert, S.atmoFrag, {
-        uColor: { value: new THREE.Color(color) }, uSun: { value: SUN },
-        uPow: { value: power }, uInt: { value: intensity }
-      }, { side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
-    );
-    const terrain = (def, p) => {
-      const g = new THREE.Group();
-      g.position.set(...def.pos);
+    /* ---------- black holes ---------- */
+    const makeHole = (def, hot, cool, tilt, roll) => {
+      const u = {
+        uTime: U.time, uHot: { value: new THREE.Color(hot) }, uCool: { value: new THREE.Color(cool) },
+        uTilt: { value: tilt }, uRoll: { value: roll }, uVis: { value: 1 }
+      };
       const mesh = new THREE.Mesh(
-        track(new THREE.SphereGeometry(def.r, 96, 64)),
-        shader(S.planetVert, S.terrainFrag, {
-          uTime: U.time, uSun: { value: SUN },
-          uSea: { value: new THREE.Color(p.sea) }, uShore: { value: new THREE.Color(p.shore) },
-          uLandA: { value: new THREE.Color(p.landA) }, uLandB: { value: new THREE.Color(p.landB) },
-          uIce: { value: new THREE.Color(p.ice) }, uAtmo: { value: new THREE.Color(p.atmo) },
-          uSeaLevel: { value: p.seaLevel }, uCloud: { value: p.cloud }, uSeed: { value: p.seed }
+        track(new THREE.PlaneGeometry(def.r * 2, def.r * 2)),
+        shader(S.bhVert, S.bhFrag, u, {
+          transparent: true, depthWrite: false, depthTest: false,
+          blending: THREE.CustomBlending,
+          blendEquation: THREE.AddEquation,
+          blendSrc: THREE.OneFactor,
+          blendDst: THREE.OneMinusSrcAlphaFactor,
+          blendSrcAlpha: THREE.OneFactor,
+          blendDstAlpha: THREE.OneMinusSrcAlphaFactor
         })
       );
-      mesh.rotation.z = p.tilt || 0.2;
-      g.add(mesh, atmosphere(def.r, p.atmo, p.atmoInt));
-      scene.add(g);
-      return { g, mesh };
+      mesh.position.set(...def.pos);
+      mesh.renderOrder = 1;
+      mesh.frustumCulled = false;
+      scene.add(mesh);
+      return mesh;
     };
-    const moonMat = track(new THREE.MeshStandardMaterial({ color: 0x9a9da8, roughness: 1, metalness: 0, flatShading: true }));
-    const makeMoon = (parent, radius, orbit, tilt, speed) => {
-      const pivot = new THREE.Group();
-      pivot.rotation.x = tilt;
-      const m = new THREE.Mesh(jitter(track(new THREE.IcosahedronGeometry(radius, 3)), 0.07, 2.4), moonMat);
-      m.position.x = orbit;
-      pivot.add(m);
-      parent.add(pivot);
-      return { pivot, m, speed };
+    const holes = {
+      home: makeHole(BODIES.home, '#bfe4ff', '#3a86e0', 0.24, -0.12),
+      about: makeHole(BODIES.about, '#ffd09a', '#d8502a', 0.2, 0.18),
+      experience: makeHole(BODIES.experience, '#ffd0f0', '#9a4ae0', 0.26, -0.2),
+      contact: makeHole(BODIES.contact, '#fff2c8', '#e89a3a', 0.22, 0.1)
     };
 
-    /* ---------- Terra (home) ---------- */
-    const terra = terrain(BODIES.terra, {
-      sea: '#0b3a7a', shore: '#2b9bd1', landA: '#2f6b3a', landB: '#9a8456', ice: '#f3f8ff',
-      atmo: '#5fb4ff', atmoInt: 0.75, seaLevel: 0.52, cloud: 0.85, seed: 3.7, tilt: 0.38
-    });
-    const moon = makeMoon(terra.g, 1.5, 19, 0.35, 0.1);
-
-    /* ---------- Ember (about) ---------- */
-    const ember = terrain(BODIES.ember, {
-      sea: '#000000', shore: '#000000', landA: '#5c2214', landB: '#b8703a', ice: '#d9cfc6',
-      atmo: '#ff8a4d', atmoInt: 0.7, seaLevel: -1.0, cloud: 0.18, seed: 11.2, tilt: 0.25
-    });
-    const emberMoon = makeMoon(ember.g, 0.9, 16, -0.3, 0.16);
-
-    /* ---------- Aurelia (experience) ---------- */
-    const giant = new THREE.Group();
-    giant.position.set(...BODIES.giant.pos);
-    const giantMesh = new THREE.Mesh(
-      track(new THREE.SphereGeometry(BODIES.giant.r, 96, 64)),
-      shader(S.planetVert, S.gasFrag, {
-        uTime: U.time, uSun: { value: SUN },
-        uA: { value: new THREE.Color('#e9cc9c') }, uB: { value: new THREE.Color('#a56f45') },
-        uC: { value: new THREE.Color('#f6e8cc') }, uAtmo: { value: new THREE.Color('#ffd9a0') },
-        uSeed: { value: 5.1 }
-      })
-    );
-    const ringIn = BODIES.giant.r * 1.35, ringOut = BODIES.giant.r * 2.3;
-    const ring = new THREE.Mesh(
-      track(new THREE.RingGeometry(ringIn, ringOut, 160, 1)),
-      shader(S.ringVert, S.ringFrag, {
-        uIn: { value: ringIn }, uOut: { value: ringOut },
-        uA: { value: new THREE.Color('#cdb48a') }, uB: { value: new THREE.Color('#f0e0bd') }
-      }, { side: THREE.DoubleSide, transparent: true, depthWrite: false })
-    );
-    ring.rotation.x = -Math.PI / 2;
-    const giantTilt = new THREE.Group();
-    giantTilt.rotation.set(0.36, 0, -0.22);
-    giantTilt.add(giantMesh, ring);
-    giant.add(giantTilt, atmosphere(BODIES.giant.r, '#ffd9a0', 0.5));
-    scene.add(giant);
-
-    /* ---------- Helion (contact) ---------- */
-    const sun = new THREE.Group();
-    sun.position.set(...BODIES.sun.pos);
-    const sunMesh = new THREE.Mesh(
-      track(new THREE.SphereGeometry(BODIES.sun.r, 64, 48)),
-      shader(S.planetVert, S.sunFrag, { uTime: U.time })
-    );
-    const glowU = { uTime: U.time, uVis: { value: 0 } };
-    const glow = new THREE.Mesh(
-      track(new THREE.PlaneGeometry(170, 170)),
-      shader(S.glowVert, S.glowFrag, glowU, { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
-    );
-    sun.add(sunMesh, glow);
-    scene.add(sun);
-
-    /* ---------- asteroid belt (projects) ---------- */
-    const ROCKS = small ? 260 : 520;
-    const rockGeo = jitter(track(new THREE.IcosahedronGeometry(1, 1)), 0.35, 1.9);
-    const rocks = new THREE.InstancedMesh(
-      rockGeo,
-      track(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0.05, flatShading: true })),
-      ROCKS
-    );
-    const rockData = [];
-    const tmp = new THREE.Object3D();
-    const tint = new THREE.Color();
-    for (let i = 0; i < ROCKS; i++) {
-      let x = 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 90;
-      let y = (Math.random() + Math.random() - 1) * 40;
-      const z = -430 + (Math.random() - 0.5) * 300;
-      if (Math.abs(x - 50) < 10 && Math.abs(y) < 9) x += x > 50 ? 12 : -12;
-      const s = Math.pow(Math.random(), 2.6) * 3.2 + 0.25;
-      rockData.push({
-        x, y, z, s,
-        sx: rnd(0.7, 1.3), sy: rnd(0.7, 1.3), sz: rnd(0.7, 1.3),
-        rx: Math.random() * 6, ry: Math.random() * 6,
-        vx: rnd(-0.25, 0.25), vy: rnd(-0.25, 0.25)
-      });
-      tint.setHSL(rnd(0.55, 0.68), rnd(0.05, 0.25), rnd(0.35, 0.6));
-      rocks.setColorAt(i, tint);
-    }
-    rocks.frustumCulled = false;
-    scene.add(rocks);
-    const updateRocks = (dt) => {
-      for (let i = 0; i < ROCKS; i++) {
-        const r = rockData[i];
-        r.rx += r.vx * dt; r.ry += r.vy * dt;
-        tmp.position.set(r.x, r.y, r.z);
-        tmp.rotation.set(r.rx, r.ry, 0);
-        tmp.scale.set(r.s * r.sx, r.s * r.sy, r.s * r.sz);
-        tmp.updateMatrix();
-        rocks.setMatrixAt(i, tmp.matrix);
+    /* ---------- open star cluster (projects) ---------- */
+    const clusterN = small ? 700 : 1500;
+    const cPos = new Float32Array(clusterN * 3), cCol = new Float32Array(clusterN * 3);
+    const cSize = new Float32Array(clusterN), cPh = new Float32Array(clusterN);
+    {
+      const c = new THREE.Color();
+      for (let i = 0; i < clusterN; i++) {
+        cPos[i * 3] = 50 + (Math.random() + Math.random() + Math.random() - 1.5) * 110;
+        cPos[i * 3 + 1] = (Math.random() + Math.random() - 1) * 55;
+        cPos[i * 3 + 2] = -430 + (Math.random() - 0.5) * 340;
+        c.set(starPalette[(Math.random() * starPalette.length) | 0]).multiplyScalar(rnd(0.7, 1));
+        cCol.set([c.r, c.g, c.b], i * 3);
+        cSize[i] = Math.pow(Math.random(), 3) * 9 + 1.6;
+        cPh[i] = Math.random();
       }
-      rocks.instanceMatrix.needsUpdate = true;
-    };
-    updateRocks(0);
+    }
+    const cGeo = track(new THREE.BufferGeometry());
+    cGeo.setAttribute('position', new THREE.BufferAttribute(cPos, 3));
+    cGeo.setAttribute('aColor', new THREE.BufferAttribute(cCol, 3));
+    cGeo.setAttribute('aSize', new THREE.BufferAttribute(cSize, 1));
+    cGeo.setAttribute('aPhase', new THREE.BufferAttribute(cPh, 1));
+    const cluster = new THREE.Points(cGeo, shader(S.starVert, S.starFrag, { uTime: U.time, uScale: { value: dpr } }, {
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending
+    }));
+    cluster.frustumCulled = false;
+    cluster.renderOrder = 2;
+    scene.add(cluster);
 
     /* ---------- shooting stars ---------- */
     const shooters = [];
@@ -291,6 +202,7 @@ export default function Space() {
       }));
       const line = new THREE.Line(g, m);
       line.frustumCulled = false;
+      line.renderOrder = 5;
       scene.add(line);
       shooters.push({ line, head: new THREE.Vector3(), vel: new THREE.Vector3(), life: 0, max: 1, len: 40 });
     }
@@ -436,25 +348,14 @@ export default function Space() {
       warpU.uLen.value = warp * 70;
       warpLines.visible = warp > 0.01;
 
-      // bodies
-      terra.mesh.rotation.y += dt * 0.045 * timeScale;
-      ember.mesh.rotation.y += dt * 0.035 * timeScale;
-      giantMesh.rotation.y += dt * 0.03 * timeScale;
-      sunMesh.rotation.y += dt * 0.01 * timeScale;
-      moon.pivot.rotation.y += dt * moon.speed * timeScale;
-      emberMoon.pivot.rotation.y += dt * emberMoon.speed * timeScale;
-      moon.m.rotation.y += dt * 0.2;
-      glow.quaternion.copy(camera.quaternion);
-      glowU.uVis.value = smooth(480, 250, camera.position.distanceTo(sun.position));
-
-      // only draw what is near the camera's part of the journey
+      // black holes: only draw those near this part of the journey
       const cz = camera.position.z;
-      terra.g.visible = cz > -450;
-      ember.g.visible = cz < -20 && cz > -420;
-      rocks.visible = cz < -150 && cz > -760;
-      giant.visible = cz < -250 && cz > -1000;
-      sun.visible = cz < -650;
-      if (rocks.visible) updateRocks(dt * timeScale);
+      holes.home.visible = cz > -450;
+      holes.about.visible = cz < -20 && cz > -420;
+      cluster.visible = cz < -150 && cz > -760;
+      holes.experience.visible = cz < -250 && cz > -1000;
+      holes.contact.visible = cz < -650;
+      for (const k in holes) if (holes[k].visible) holes[k].quaternion.copy(camera.quaternion);
 
       // shooting stars
       if (!reduce) {
@@ -482,7 +383,6 @@ export default function Space() {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('resize', onResize);
       disposables.forEach((d) => d.dispose && d.dispose());
-      rocks.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === el) el.removeChild(renderer.domElement);
     };

@@ -4,6 +4,8 @@ import Magnetic from '../components/Magnetic.jsx';
 import Reveal from '../components/Reveal.jsx';
 import { P } from '../data.js';
 
+const gmail = (to) => `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}`;
+
 export default function Contact() {
   const [name, setName] = useState('');
   const [msg, setMsg] = useState('');
@@ -11,7 +13,7 @@ export default function Contact() {
     e.preventDefault();
     const subject = encodeURIComponent(`Hello from ${name || 'your portfolio'}`);
     const body = encodeURIComponent(`${msg}\n\n— ${name}`);
-    window.location.href = `mailto:${P.email}?subject=${subject}&body=${body}`;
+    window.open(`${gmail(P.email)}&su=${subject}&body=${body}`, '_blank', 'noopener,noreferrer');
   };
   return (
     <>
@@ -23,7 +25,7 @@ export default function Contact() {
 
       <section className="contact-grid">
         <Reveal className="contact-left">
-          <Magnetic><a className="email-btn" href={`mailto:${P.email}`} data-hover>{P.email} <ArrowUpRight size={18} /></a></Magnetic>
+          <Magnetic><a className="email-btn" href={gmail(P.email)} target="_blank" rel="noopener noreferrer" data-hover>{P.email} <ArrowUpRight size={18} /></a></Magnetic>
           <div className="socials">
             <a href={P.github} target="_blank" rel="noreferrer"><Github size={16} /> GitHub</a>
             <a href={P.linkedin} target="_blank" rel="noreferrer"><Linkedin size={16} /> LinkedIn</a>
@@ -32,10 +34,10 @@ export default function Contact() {
 
         <Reveal delay={0.1}>
           <form className="card transmit" onSubmit={send}>
-            <label>Your name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Lovelace" autoComplete="name" /></label>
+            <label>Your name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="" autoComplete="name" /></label>
             <label>Message<textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={5} placeholder="Tell me about the project…" required /></label>
             <Magnetic strength={0.2}><button className="btn btn-solid" type="submit">Transmit <ArrowUpRight size={16} /></button></Magnetic>
-            <p className="form-note">Opens your email app with the message ready to send.</p>
+            <p className="form-note">Opens Gmail with the message ready to send.</p>
           </form>
         </Reveal>
       </section>
